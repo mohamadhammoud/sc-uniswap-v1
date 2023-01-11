@@ -13,14 +13,14 @@ describe("Start Point", async function () {
     const tokenFactory = await ethers.getContractFactory("Token");
     const exchangeFactory = await ethers.getContractFactory("Exchange");
 
-    token = await tokenFactory.deploy("USDC", "USDC", utils.parseEther("200"));
+    token = await tokenFactory.deploy("USDC", "USDC", utils.parseEther("2000"));
 
     exchange = await exchangeFactory.deploy(token.address);
   });
 
   describe("addLiquidity", async function () {
     it("adds liquidity and swaps", async function () {
-      await token.approve(exchange.address, utils.parseEther("200"));
+      await token.approve(exchange.address, utils.parseEther("2000"));
 
       let ownerBalance = await getBalance(owner.address);
       let exchangeBalance = await getBalance(exchange.address);
@@ -53,8 +53,8 @@ describe("Start Point", async function () {
         "-------------------------------------------------------------------------"
       );
 
-      await exchange.addLiquidity(utils.parseEther("200"), {
-        value: utils.parseEther("100"),
+      await exchange.addLiquidity(utils.parseEther("2000"), {
+        value: utils.parseEther("1000"),
       });
 
       tokenOwnerBalance = await token.balanceOf(owner.address);
@@ -83,10 +83,10 @@ describe("Start Point", async function () {
       );
 
       expect(await getBalance(exchange.address)).to.equal(
-        utils.parseEther("100")
+        utils.parseEther("1000")
       );
 
-      expect(await exchange.getReserve()).to.equal(utils.parseEther("200"));
+      expect(await exchange.getReserve()).to.equal(utils.parseEther("2000"));
 
       console.log(
         "-------------------------------------------------------------------------"
