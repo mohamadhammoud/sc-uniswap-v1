@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./interfaces/IFactory.sol";
+import "./interfaces/IExchange.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -9,13 +11,15 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 /// @notice You can use this contract for only the most basic simulation
 /// @dev All function calls are currently implemented without side effects
 /// @custom:experimental This is an experimental contract.
-contract Exchange is ERC20 {
+contract Exchange is IExchange, ERC20 {
     address public tokenAddress;
+    address public factoryAddress;
 
     constructor(address _token) ERC20("Hammoudswap-V1", "Kristo-V1") {
         require(_token != address(0), "invalid token address");
 
         tokenAddress = _token;
+        factoryAddress = msg.sender;
     }
 
     /// @notice Adding Liquidity to the Contract
@@ -63,20 +67,51 @@ contract Exchange is ERC20 {
         return (ethAmount, tokenAmount);
     }
 
+    function tokenToTokenSwap(
+        uint256 _tokensSold,
+        uint256 _minTokensBought,
+        address _tokenAddress
+    ) public {
+        address exchangeAddress = IFactory(factoryAddress).getExchange(
+            _tokenAddress
+        );
+
+        require(
+            exchangeAddress != address(this) && exchangeAddress != address(0),
+            "invalid exchange address"
+        );
+
+        uint256 tokenReserve = getReserve();
+        uint256 ethBought = getAmount(
+            _tokensSold,
+            tokenReserve,
+            address(this).balance
+        );
+
+        IERC20(tokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokensSold
+        );
+
+        IExchange(exchangeAddress).ethToTokenTransfer{value: ethBought}(
+            _minTokensBought,
+            msg.sender
+        );
+    }
+
+    function ethToTokenTransfer(
+        uint256 _minTokens,
+        address _recipient
+    ) external payable {
+        ethToToken(_minTokens, _recipient);
+    }
+
     /// @notice Swapping Ether to tokens
     /// @dev This function accepts ether as value in tx and minimum amount of tokens as slippage
     /// @param _minTokens Minimum number of tokens wanted from amount of swapped Ether.
     function ethToTokenSwap(uint256 _minTokens) public payable {
-        uint256 tokenReserve = getReserve();
-        uint256 tokensBought = getAmount(
-            msg.value,
-            address(this).balance - msg.value,
-            tokenReserve
-        );
-
-        require(tokensBought >= _minTokens, "insufficient output amount");
-
-        IERC20(tokenAddress).transfer(msg.sender, tokensBought);
+        ethToToken(_minTokens, msg.sender);
     }
 
     /// @notice Swapping Tokens to Ether
@@ -128,6 +163,19 @@ contract Exchange is ERC20 {
         uint256 tokenReserve = getReserve();
 
         return getAmount(_tokenSold, tokenReserve, address(this).balance);
+    }
+
+    function ethToToken(uint256 _minTokens, address recipient) private {
+        uint256 tokenReserve = getReserve();
+        uint256 tokensBought = getAmount(
+            msg.value,
+            address(this).balance - msg.value,
+            tokenReserve
+        );
+
+        require(tokensBought >= _minTokens, "insufficient output amount");
+
+        IERC20(tokenAddress).transfer(recipient, tokensBought);
     }
 
     /// @notice Uniswap V1 formula
